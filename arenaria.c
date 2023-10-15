@@ -9,7 +9,7 @@ static int arenaria_block_can_fit(ArenariaBlock block, size_t size);
 static void arenaria_arena_append_empty_block(ArenariaArena *arena, int capacity);
 static int arenaria_max_int(int a, int b);
 
-ArenariaArena arenaria_arena_make(void *((*allocator)(size_t)), void (*freeer)(void *)) {
+ArenariaArena arenaria_arena_create(void *((*allocator)(size_t)), void (*freeer)(void *)) {
     ArenariaArena arena;
     arena.blocks = NULL;
     arena.allocator = allocator;
