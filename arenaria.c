@@ -19,21 +19,29 @@ ArenariaArena arenaria_arena_create(void *((*allocator)(size_t)), void (*freeer)
     return arena;
 }
 
-void arenaria_arena_destroy(ArenariaArena arena) {
-    for (int i = 0; i < arena.length; i++) {
-        void *block_data = arena.blocks[i].data;
+void arenaria_arena_destroy(ArenariaArena *arena) {
+    for (int i = 0; i < arena->length; i++) {
+        void *block_data = arena->blocks[i].data;
         if (block_data != NULL) {
-            arena.freeer(block_data);
+            arena->freeer(block_data);
         }
     }
-    arena.freeer(arena.blocks);
+    arena->freeer(arena->blocks);
+    arena->blocks = NULL;
+    arena->allocator = NULL;
+    arena->freeer = NULL;
+    arena->length = 0;
+    arena->capacity = 0;
 }
 
 void *arenaria_malloc(ArenariaArena *arena, size_t size) {
     if (arena->length == 0 || !arenaria_block_can_fit(*arenaria_arena_get_last_block(arena), size)) {
-        arenaria_arena_append_empty_block(arena, arenaria_max_int(size, MIN_BLOCK_SIZE));
+        arenaria_arena_append_empty_block(arena, arenaria_max_int(size, ARENARIA_MIN_BLOCK_SIZE));
     }
     ArenariaBlock *last_block = arenaria_arena_get_last_block(arena);
+    if (last_block->data == NULL) {
+        return NULL;
+    }
     void *result = last_block->data + last_block->length;
     last_block->length += size;
     return result;
@@ -46,21 +54,31 @@ static ArenariaBlock *arenaria_arena_get_last_block(ArenariaArena *arena) {
 static void arenaria_arena_append_empty_block(ArenariaArena *arena, int capacity) {
     if (arena->length >= arena->capacity) {
         int old_capacity = arena->capacity;
-        arena->capacity *= 2;
-        if (arena->capacity == 0) {
-            arena->capacity = INITIAL_ARENA_CAPACITY;
+        int new_capacity = old_capacity * 2;
+        if (new_capacity == 0) {
+            new_capacity = ARENARIA_INITIAL_ARENA_CAPACITY;
         }
         ArenariaBlock *old_blocks = arena->blocks;
-        arena->blocks = (ArenariaBlock *) arena->allocator(sizeof(ArenariaBlock) * arena->capacity);
-        if (old_blocks != NULL) {
-            memcpy(arena->blocks, old_blocks, old_capacity);
+        ArenariaBlock *new_blocks = (ArenariaBlock *) arena->allocator(sizeof(ArenariaBlock) * arena->capacity);
+        if (new_blocks == NULL) {
+            return;
         }
+        if (old_blocks != NULL) {
+            memcpy(new_blocks, old_blocks, old_capacity);
+            arena->freeer(old_blocks);
+        }
+        arena->capacity = new_capacity;
+        arena->blocks = new_blocks;
+    }
+    void *new_block_data = arena->allocator(capacity);
+    if (new_block_data == NULL) {
+        return;
     }
     arena->length++;
     ArenariaBlock *last = arenaria_arena_get_last_block(arena);
     last->length = 0;
     last->capacity = capacity;
-    last->data = arena->allocator(capacity);
+    last->data = new_block_data;
 }
 
 static int arenaria_block_can_fit(ArenariaBlock block, size_t size) {

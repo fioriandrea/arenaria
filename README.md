@@ -19,7 +19,7 @@ int main() {
     arenaria_malloc(&arena, 3000);
     arenaria_malloc(&arena, 4000);
 
-    arenaria_arena_destroy(arena);
+    arenaria_arena_destroy(&arena);
 
     return 0;
 }
